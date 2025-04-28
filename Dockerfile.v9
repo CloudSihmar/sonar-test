@@ -1,0 +1,33 @@
+# -------- Stage 1: Prepare SonarQube --------
+FROM eclipse-temurin:17.0.15_6-jre-alpine-3.21 AS sonarqube-builder
+
+ENV SONARQUBE_VERSION=25.4.0.105899
+ENV SONARQUBE_ZIP=sonarqube-${SONARQUBE_VERSION}.zip
+
+RUN addgroup -g 900 sonarqube && \
+    adduser -D -u 900 -G sonarqube sonarqube
+
+WORKDIR /app
+
+RUN apk add --no-cache wget unzip bash && \
+    wget https://binaries.sonarsource.com/Distribution/sonarqube/${SONARQUBE_ZIP} && \
+    unzip ${SONARQUBE_ZIP} && \
+    mv sonarqube-${SONARQUBE_VERSION} sonarqube && \
+    rm ${SONARQUBE_ZIP} && \
+    chown -R sonarqube:sonarqube sonarqube
+
+# -------- Stage 2: Final runtime image --------
+FROM eclipse-temurin:17.0.15_6-jre-alpine-3.21
+
+ENV SONARQUBE_HOME=/opt/sonarqube
+ENV ES_JAVA_OPTS="-Xms1g -Xmx1g"
+
+COPY --from=sonarqube-builder /app/sonarqube ${SONARQUBE_HOME}
+
+USER 900:900
+WORKDIR ${SONARQUBE_HOME}
+
+EXPOSE 9000
+
+ENTRYPOINT ["java", "-jar", "/opt/sonarqube/lib/sonar-application-25.4.0.105899.jar"]
+
